@@ -34,7 +34,6 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
         run: |
           docker buildx build --push --tag $DOCKER_HUB_USERNAME/sample-ui:latest .
-          docker buildx build --push --tag $DOCKER_HUB_USERNAME/sample-ui:${{ github.sha }} .
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v1
@@ -47,12 +46,12 @@ jobs:
         run: |
           mkdir -p $HOME/.kube
           echo "$KUBE_CONFIG_DATA" | base64 --decode > $HOME/.kube/config
+          kubectl config view  # Verify kubeconfig content
 
       - name: Apply Kubernetes manifests
         env:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
         run: |
-          # Update k8s.yaml with the new image tag
-          sed -i "s|ashwini939/sample-ui:.*|ashwini939/sample-ui:latest|g" k8s/k8s.yaml
-          kubectl apply -f k8s/k8s.yaml
-          kubectl rollout status deployment/sample-ui-deployment -n ashwini
+          sed -i "s|ashwini939/sample-ui:.*|${DOCKER_HUB_USERNAME}/sample-ui:latest|g" k8s/k8s.yaml
+          kubectl apply -f k8s/k8s.yaml --kubeconfig=$HOME/.kube/config
+          kubectl rollout status deployment/sample-ui-deployment -n ashwini --kubeconfig=$HOME/.kube/config
