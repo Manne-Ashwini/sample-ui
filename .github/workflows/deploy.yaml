@@ -34,6 +34,7 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
         run: |
           docker buildx build --push --tag $DOCKER_HUB_USERNAME/sample-ui:latest .
+          docker buildx build --push --tag $DOCKER_HUB_USERNAME/sample-ui:${{ github.sha }} .
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v1
@@ -52,6 +53,6 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
         run: |
           # Update k8s.yaml with the new image tag
-          sed -i "s|DOCKER_HUB_USERNAME/sample-ui:.*|$DOCKER_HUB_USERNAME/sample-ui:latest|g" k8s/k8s.yaml
-          kubectl apply -f k8s.yaml
+          sed -i "s|ashwini939/sample-ui:.*|ashwini939/sample-ui:latest|g" k8s/k8s.yaml
+          kubectl apply -f k8s/k8s.yaml
           kubectl rollout status deployment/sample-ui-deployment -n ashwini
