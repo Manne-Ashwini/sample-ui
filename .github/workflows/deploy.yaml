@@ -1,57 +1,60 @@
-name: CI/CD Pipeline
+name: Node.js CI/CD
 
 on:
   push:
     branches:
-      - main
+      - main  # Adjust branch name if needed
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
 
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
 
-      - name: Log in to Docker Hub
-        env:
-          DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
-        run: echo $DOCKER_HUB_PASSWORD | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
+    - name: Log in to Docker Hub
+      env:
+        DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      run: echo $DOCKER_HUB_PASSWORD | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
 
-      - name: Build and push Docker image
-        env:
-          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
-        run: |
-          docker buildx build --push --tag $DOCKER_HUB_USERNAME/sample-ui:latest .
+    - name: Build and push Docker image
+      run: |
+        docker buildx build --push --tag ${{ secrets.DOCKER_HUB_USERNAME }}/sample-ui:latest .
+        docker buildx build --push --tag ${{ secrets.DOCKER_HUB_USERNAME }}/sample-ui:${{ github.sha }} .
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v1
-        with:
-          version: 'v1.21.0'
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
 
-      - name: Configure kubectl
-        env:
-          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_BASE64 }}
-        run: |
-          mkdir -p $HOME/.kube
-          echo "$KUBE_CONFIG_DATA" | base64 --decode > $HOME/.kube/config
-          kubectl config view  # Verify kubeconfig content
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Apply Kubernetes manifests
-        env:
-          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
-        run: |
-          sed -i "s|ashwini939/sample-ui:.*|${DOCKER_HUB_USERNAME}/sample-ui:latest|g" k8s/k8s.yaml
-          kubectl apply -f k8s/k8s.yaml --kubeconfig=$HOME/.kube/config
-          kubectl rollout status deployment/sample-ui-deployment -n ashwini --kubeconfig=$HOME/.kube/config
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v1
+      with:
+        version: 'v1.29.2'  # Use the version compatible with your cluster
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p $HOME/.kube
+        echo "$KUBE_CONFIG_DATA" | base64 --decode > $HOME/.kube/config
+        kubectl config view  # Verify kubeconfig content
+
+    - name: Update Kubernetes deployment
+      run: |
+        sed -i "s|DOCKER_HUB_USERNAME/sample-ui:.*|${{ secrets.DOCKER_HUB_USERNAME }}/sample-ui:latest|g" k8s/k8s.yaml
+        kubectl apply -f k8s/k8s.yaml --kubeconfig=$HOME/.kube/config
+        kubectl rollout status deployment/sample-ui-deployment -n ashwini --kubeconfig=$HOME/.kube/config

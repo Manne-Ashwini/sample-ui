@@ -15,9 +15,10 @@ spec:
     spec:
       containers:
         - name: sample-ui-container
-          image: DOCKER_HUB_USERNAME/sample-ui:latest
+          image: ashwini939/sample-ui:latest  # Placeholder; will be replaced by sed in GitHub Actions
           ports:
             - containerPort: 3000
+
 ---
 apiVersion: v1
 kind: Service
